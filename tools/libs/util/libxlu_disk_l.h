@@ -2,13 +2,10 @@
 #define xlu__disk_yyHEADER_H 1
 #define xlu__disk_yyIN_HEADER 1
 
-#line 5 "libxlu_disk_l.h"
-#line 31 "libxlu_disk_l.l"
+#line 6 "libxlu_disk_l.h"
 #define _GNU_SOURCE
 
-
-
-#line 11 "libxlu_disk_l.h"
+#line 9 "libxlu_disk_l.h"
 
 #define  YY_INT_ALIGNED short int
 
@@ -699,6 +696,6 @@ extern int yylex (yyscan_t yyscanner);
 
 #line 306 "libxlu_disk_l.l"
 
-#line 702 "libxlu_disk_l.h"
+#line 700 "libxlu_disk_l.h"
 #undef xlu__disk_yyIN_HEADER
 #endif /* xlu__disk_yyHEADER_H */

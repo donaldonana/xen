@@ -78,30 +78,31 @@ void __xsm_action_mismatch_detected(void);
 static always_inline int xsm_default_action(
     xsm_default_t action, struct domain *src, struct domain *target)
 {
-    switch ( action ) {
-    case XSM_HOOK:
-        return 0;
-    case XSM_TARGET:
-        if ( evaluate_nospec(src == target) )
-            return 0;
-        fallthrough;
-    case XSM_XS_PRIV:
-        if ( action == XSM_XS_PRIV &&
-             evaluate_nospec(is_xenstore_domain(src)) )
-            return 0;
-        fallthrough;
-    case XSM_DM_PRIV:
-        if ( target && evaluate_nospec(src->target == target) )
-            return 0;
-        fallthrough;
-    case XSM_PRIV:
-        if ( is_control_domain(src) )
-            return 0;
-        return -EPERM;
-    default:
-        LINKER_BUG_ON(1);
-        return -EPERM;
-    }
+    return 0;
+    // switch ( action ) {
+    // case XSM_HOOK:
+    //     return 0;
+    // case XSM_TARGET:
+    //     if ( evaluate_nospec(src == target) )
+    //         return 0;
+    //     fallthrough;
+    // case XSM_XS_PRIV:
+    //     if ( action == XSM_XS_PRIV &&
+    //          evaluate_nospec(is_xenstore_domain(src)) )
+    //         return 0;
+    //     fallthrough;
+    // case XSM_DM_PRIV:
+    //     if ( target && evaluate_nospec(src->target == target) )
+    //         return 0;
+    //     fallthrough;
+    // case XSM_PRIV:
+    //     if ( is_control_domain(src) )
+    //         return 0;
+    //     return -EPERM;
+    // default:
+    //     LINKER_BUG_ON(1);
+    //     return -EPERM;
+    // }
 }
 
 static XSM_INLINE int cf_check xsm_set_system_active(void)
