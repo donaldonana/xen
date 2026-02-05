@@ -20,6 +20,14 @@
 #include "xl.h"
 
 const struct cmd_spec cmd_table[] = {
+
+    {
+      "map",
+      &main_map, 0, 0,
+      "Map a domain's memory into another domain's address space for VMI",
+      "[options] <Domain>",
+      "-h                      Print this help.\n"
+    },
     { "create",
       &main_create, 1, 1,
       "Create a domain from config file <filename>",

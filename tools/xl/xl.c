@@ -411,6 +411,7 @@ int main(int argc, char **argv)
 
     cmd = argv[optind];
 
+    // sudo xl
     if (!cmd) {
         help(NULL);
         exit(EXIT_FAILURE);
@@ -441,6 +442,7 @@ int main(int argc, char **argv)
     argc -= optind;
     optind = 1;
 
+    // sudo xl <subcomand>
     cspec = cmdtable_lookup(cmd);
     if (cspec) {
         if (dryrun_only && !cspec->can_dryrun) {
@@ -482,6 +484,7 @@ void help(const char *command)
     int i;
     const struct cmd_spec *cmd;
 
+    // sudo xl or sudo xl help
     if (!command || !strcmp(command, "help")) {
         printf("Usage xl [-vfNtT] <subcommand> [args]\n\n");
         printf("xl full list of subcommands:\n\n");
@@ -492,6 +495,7 @@ void help(const char *command)
             printf("%s\n", cmd_table[i].cmd_desc);
         }
     } else {
+        // sudo xl help <subcommand>
         cmd = cmdtable_lookup(command);
         if (cmd) {
             printf("Usage: xl [-vtT%s%s] %s %s\n\n%s.\n\n",

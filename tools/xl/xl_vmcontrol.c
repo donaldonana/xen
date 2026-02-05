@@ -1167,6 +1167,12 @@ out:
     return ret;
 }
 
+int main_map(int argc, char **argv)
+{
+    fprintf(stderr, "map command is not yet supported\n");
+    return 1;
+}
+
 int main_create(int argc, char **argv)
 {
     struct domain_create dom_info = {
