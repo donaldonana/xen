@@ -1571,7 +1571,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         return rc;
     }
-
+    // XENMEM_add_to_physmap_range
     case XENMEM_add_to_physmap_batch:
     {
         struct xen_add_to_physmap_batch xatpb;

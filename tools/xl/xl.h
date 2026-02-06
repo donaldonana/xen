@@ -29,6 +29,15 @@ struct cmd_spec {
     const char *cmd_option;
 };
 
+
+struct domain_map
+{
+    uint32_t id_obs; /* domain id of the domain to map into   */
+    uint32_t id_targ; /* domain id of the domain to be mapped */
+    uint64_t size;
+    uint64_t address; /* start address in the observer domain to map */
+};
+
 struct domain_create {
     int debug;
     int daemonize;

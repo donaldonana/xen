@@ -1169,7 +1169,50 @@ out:
 
 int main_map(int argc, char **argv)
 {
-    fprintf(stderr, "map command is not yet supported\n");
+
+    struct domain_map map_info ={
+        .id_obs = 0,
+        .id_targ = 0,
+        .size = 0,
+        .address = 0,
+        
+    };
+
+    int opt;
+    static const struct option opts[] = {
+        {"observer", 1, 0, 'o'},
+        {"target", 1, 0, 't'},
+        {"size", 1, 0, 's'},
+        {"address", 1, 0, 'a'},
+        COMMON_LONG_OPTS
+    };
+
+        SWITCH_FOREACH_OPT(opt, "a:o:s:t:", opts, "map", 0) {
+    case 'o':
+        map_info.id_obs = strtoull(optarg, NULL, 0);
+        break;
+    case 't':
+        map_info.id_targ = strtoull(optarg, NULL, 0);
+        break;
+    case 's':
+        map_info.size = strtoull(optarg, NULL, 0);
+        break;
+    case 'a':
+        map_info.address = strtoull(optarg, NULL, 0);
+        break;
+    }
+
+    // Just print the options for now, until we implement the map command
+
+    fprintf(stderr, "\n Just print the options for now, until we implement the map command:\n");
+    fprintf(stderr, "  observer domain id: %u\n", map_info.id_obs ? map_info.id_obs : 0);
+    fprintf(stderr, "  target domain id : %u\n", map_info.id_targ ? map_info.id_targ : 0);
+    fprintf(stderr, "  size: %lu\n", map_info.size);
+    fprintf(stderr, "  address: %lu\n", map_info.address);
+
+    
+
+
     return 1;
 }
 
