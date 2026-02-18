@@ -374,3 +374,6 @@ tools/xl/xl
 docs/txt/misc/*.txt
 docs/txt/man/*.txt
 docs/figs/*.png
+
+
+compile_commands.json

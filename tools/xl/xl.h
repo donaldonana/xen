@@ -32,10 +32,11 @@ struct cmd_spec {
 
 struct domain_map
 {
-    uint32_t id_obs; /* domain id of the domain to map into   */
-    uint32_t id_targ; /* domain id of the domain to be mapped */
-    uint64_t size;
-    uint64_t address; /* start address in the observer domain to map */
+    uint32_t id_obs; /*  observer domain id to map into */
+    uint32_t id_targ; /* target domain id to map from */
+    uint64_t nbr;
+    uint64_t ad_obs; /* observer frame address to map into */
+    uint64_t ad_targ; /* target frame address to map from */
 };
 
 struct domain_create {
@@ -60,6 +61,8 @@ struct domain_create {
 };
 
 int create_domain(struct domain_create *dom_info);
+
+int map_domain(struct domain_map *map_info);
 
 
 static const char savefileheader_magic[32]=

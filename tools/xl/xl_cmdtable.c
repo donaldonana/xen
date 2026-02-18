@@ -24,13 +24,15 @@ const struct cmd_spec cmd_table[] = {
     {
       "map",
       &main_map, 0, 0,
-      "Map a target domain's memory into observer domain's address space for VMI or similar purposes",
-      " -t <id> -o <id> -s <size>  -a <address>",
-      "-h                      Print this help.\n"
-      "-o, --observer <id>     Domain ID of the observer domain.\n"
-      "-t, --target <id>       Domain ID of the target domain.\n"
-      "-s, --size <size>       Size of the memory to map, in bytes.\n"
-      "-a, --address <address> start address in the observer domain to map. \n"
+      "Map a domain memory frame into another domain memory space for VMI or similar purposes",
+      "-o [DomID] -t [DomID]  -x [address] -y [address]",
+      
+      "-o, --obs          [DomID]        observer domain id to map into.\n"
+      "-t, --targ         [DomID]        target domain id to map from.\n"
+      "-x, --adobs        [Address]      observer frame address to map into. \n"
+      "-y, --adtarg       [Address]      target frame address to map from. \n"
+      "-h                                print this help.\n"
+      // "-n, --nbr       [Number]        number of frames to map.\n"
     },
     { "create",
       &main_create, 1, 1,

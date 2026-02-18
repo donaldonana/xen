@@ -350,6 +350,8 @@ static inline int do_multicall_op(xc_interface *xch,
     int ret = -1;
     DECLARE_HYPERCALL_BUFFER_ARGUMENT(call_list);
 
+    // fprintf(stderr, " \n hypercall checck point \n");
+
     ret = xencall2(xch->xcall, __HYPERVISOR_multicall,
                    HYPERCALL_BUFFER_AS_ARG(call_list), nr_calls);
     if ( ret < 0 )

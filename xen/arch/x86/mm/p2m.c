@@ -1875,6 +1875,8 @@ static int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
     struct domain *fdom;
 
     if ( !arch_acquire_resource_check(tdom) )
+        printk( "******** FAILL HERE  arch_acquire_resource_check ********\n" );
+
         return -EPERM;
 
     if ( foreigndom == DOMID_XEN )
@@ -1925,6 +1927,8 @@ static int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
         if ( rc )
             goto put_both;
     }
+    printk( "******** REMOVE OK ********\n" );
+
     /*
      * Create the new mapping. Can't use p2m_add_page() because it
      * will update the m2p table which will result in  mfn -> gpfn of dom0
@@ -1935,6 +1939,10 @@ static int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
         gdprintk(XENLOG_WARNING, "set_foreign_p2m_entry failed. "
                  "gpfn:%lx mfn:%lx fgfn:%lx td:%d fd:%d\n",
                  gpfn, mfn_x(mfn), fgfn, tdom->domain_id, fdom->domain_id);
+    
+
+    printk( "******** ADD FOREIGN OK ********\n" );
+    
 
  put_both:
     /*
@@ -2000,6 +2008,8 @@ int xenmem_add_to_physmap_one(
     }
 
     case XENMAPSPACE_gmfn_foreign:
+        printk( "******** RUN XENMAPSPACE_gmfn_foreign  ********\n" );
+
         return p2m_add_foreign(d, idx, gfn_x(gfn), extra.foreign_domid);
     }
 
@@ -2033,7 +2043,11 @@ int xenmem_add_to_physmap_one(
 
     /* Remove previously mapped page if it was present. */
     if ( p2mt == p2m_mmio_direct )
-        rc = -EPERM;
+    {
+            /* MMIO direct mapping is not allowed to be remapped. */
+            rc = -EPERM;
+    }
+        
     else if ( mfn_valid(prev_mfn) )
     {
         if ( is_special_page(mfn_to_page(prev_mfn)) )
@@ -2048,9 +2062,11 @@ int xenmem_add_to_physmap_one(
     if ( !rc && old_gfn != INVALID_M2P_ENTRY && !gfn_eq(_gfn(old_gfn), gfn) )
         rc = p2m_remove_page(d, _gfn(old_gfn), mfn, PAGE_ORDER_4K);
 
+
     /* Map at new location. */
     if ( !rc )
         rc = p2m_add_page(d, gfn, mfn, PAGE_ORDER_4K, p2m_ram_rw);
+
 
  put_all:
     put_gfn(d, gfn_x(gfn));

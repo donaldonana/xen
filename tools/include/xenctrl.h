@@ -541,6 +541,8 @@ int xc_domain_max_vcpus(xc_interface *xch,
  */
 int xc_domain_pause(xc_interface *xch,
                     uint32_t domid);
+
+int xc_domain_map(xc_interface *xch);
 /**
  * This function unpauses a domain.  The domain should have been previously
  * paused.

@@ -344,6 +344,7 @@ long xc_memory_op(xc_interface *xch, unsigned int cmd, void *arg, size_t len)
      * interface structure, issue the request as a single-element multicall,
      * to be able to capture the full return value.
      */
+
     if ( sizeof(long) > sizeof(int) )
     {
         multicall_entry_t multicall = {
@@ -359,6 +360,7 @@ long xc_memory_op(xc_interface *xch, unsigned int cmd, void *arg, size_t len)
             PERROR("Could not bounce buffer for memory_op hypercall");
             goto out1;
         }
+
 
         ret = do_multicall_op(xch, HYPERCALL_BUFFER(call), 1);
 

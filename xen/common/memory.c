@@ -1109,6 +1109,8 @@ static long xatp_permission_check(struct domain *d, unsigned int space)
 {
     if ( !paging_mode_translate(d) )
         return -EACCES;
+    
+    
 
     /*
      * XENMAPSPACE_dev_mmio mapping is only supported for hardware Domain
@@ -1117,6 +1119,8 @@ static long xatp_permission_check(struct domain *d, unsigned int space)
     if ( (space == XENMAPSPACE_dev_mmio) &&
          (!is_hardware_domain(d) || (d != current->domain)) )
         return -EACCES;
+
+    printk( "********domain %d pass XENMAPSPACE_dev_mmio check ********\n", d->domain_id );
 
     return xsm_add_to_physmap(XSM_TARGET, current->domain, d);
 }
@@ -1574,6 +1578,8 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     // XENMEM_add_to_physmap_range
     case XENMEM_add_to_physmap_batch:
     {
+
+
         struct xen_add_to_physmap_batch xatpb;
 
         BUILD_BUG_ON((typeof(xatpb.size))-1 >
@@ -1588,27 +1594,49 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         /* This mapspace is unsupported for this hypercall. */
         if ( xatpb.space == XENMAPSPACE_gmfn_range )
+        {
             return -EOPNOTSUPP;
+        }
+
+        printk( "********space %d********\n", xatpb.space);
+
 
         d = rcu_lock_domain_by_any_id(xatpb.domid);
         if ( d == NULL )
             return -ESRCH;
+        
+        printk( "********domain %d pass ESRCH check ********\n", xatpb.domid);
+        
 
         rc = xatp_permission_check(d, xatpb.space);
         if ( rc )
         {
             rcu_unlock_domain(d);
+            printk( "********domain %d fail permission check ********\n", xatpb.domid);
             return rc;
         }
+        printk( "********domain %d pass permission check ********\n", xatpb.domid);
 
         rc = xenmem_add_to_physmap_batch(d, &xatpb, start_extent);
 
         rcu_unlock_domain(d);
+        printk( "********domain %dpass add_to_physmap_batch ********\n", xatpb.domid);
+    
 
         if ( rc > 0 )
+        {
+
             rc = hypercall_create_continuation(
                     __HYPERVISOR_memory_op, "lh",
                     op | (rc << MEMOP_EXTENT_SHIFT), arg);
+            
+            printk( "********domain %dpass ahypercall_create_continuation ********\n", xatpb.domid);
+
+        }
+
+            
+
+            
 
         return rc;
     }

@@ -15,6 +15,7 @@
 #include "libxl_osdeps.h"
 
 #include "libxl_internal.h"
+ 
 
 #define PAGE_TO_MEMKB(pages) ((pages) * 4)
 
@@ -571,6 +572,35 @@ int libxl_domain_suspend_only(libxl_ctx *ctx, uint32_t domid,
 
  out_err:
     return AO_CREATE_FAIL(rc);
+}
+
+
+int libxl_domain_map(libxl_ctx *ctx, uint32_t id_obs, uint32_t id_targ, uint64_t *target_idxs, 
+     uint64_t *observer_gpfns, 
+    const libxl_asyncop_how *ao_how)
+{
+
+    int r;
+   
+    int errs[1] = {-555};
+
+    r = xc_domain_add_to_physmap_batch(ctx->xch, 
+                                   id_obs,               // Observer DomID
+                                   id_targ,              // Target DomID
+                                   XENMAPSPACE_gmfn_foreign, 
+                                   1,                    // nbr of frames to map
+                                   target_idxs, 
+                                   observer_gpfns, 
+                                   errs);
+
+    if (r < 0 || errs[0] != 0) {
+        fprintf(stderr, "\nFailed: r=%d, errs[0]=%d\n", r, errs[0]);
+    } else {
+        printf("\nSuccessfully mapped  domain %u frame %lu into domain %u frame %lu\n", id_targ, target_idxs[0], id_obs, observer_gpfns[0]);
+    }
+
+
+    return 1; 
 }
 
 int libxl_domain_pause(libxl_ctx *ctx, uint32_t domid,

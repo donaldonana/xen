@@ -1930,6 +1930,10 @@ int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
    * transactionally that the domain has the old old name; if
    * trans is not 0 we use caller's transaction and caller must do retries */
 
+int libxl_domain_map(libxl_ctx *ctx, uint32_t id_obs, uint32_t id_targ, uint64_t *target_idxs,  uint64_t *observer_gpfns, const libxl_asyncop_how *ao_how)
+                       LIBXL_EXTERNAL_CALLERS_ONLY;
+
+
 int libxl_domain_pause(libxl_ctx *ctx, uint32_t domid,
                        const libxl_asyncop_how *ao_how)
                        LIBXL_EXTERNAL_CALLERS_ONLY;

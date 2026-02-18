@@ -26,6 +26,8 @@
 #include <libxl_utils.h>
 #include <libxlutil.h>
 
+#include <xen/memory.h>
+
 #include "xl.h"
 #include "xl_utils.h"
 #include "xl_parse.h"
@@ -649,6 +651,26 @@ static void autoconnect_console(libxl_ctx *ctx_ignored,
     _exit(1);
 }
 
+int map_domain(struct domain_map *map_info)
+{
+ 
+    uint32_t id_obs, id_targ;
+    uint64_t size;
+    uint64_t target_idxs[1], observer_gpfns[1];
+    
+    observer_gpfns[0] = map_info->ad_obs ;
+    target_idxs[0]    = map_info->ad_targ ;
+    id_obs  = map_info->id_obs;
+    id_targ = map_info->id_targ;    
+    size    = 1; 
+ 
+
+    libxl_domain_map(ctx, id_obs, id_targ, target_idxs, observer_gpfns, NULL);
+
+    return 1;
+
+}
+
 int create_domain(struct domain_create *dom_info)
 {
     uint32_t domid = INVALID_DOMID;
@@ -1173,47 +1195,47 @@ int main_map(int argc, char **argv)
     struct domain_map map_info ={
         .id_obs = 0,
         .id_targ = 0,
-        .size = 0,
-        .address = 0,
-        
+        .nbr = 0,
+        .ad_obs = 0,
+        .ad_targ = 0,
     };
 
-    int opt;
+    int rc, opt;
     static const struct option opts[] = {
-        {"observer", 1, 0, 'o'},
-        {"target", 1, 0, 't'},
-        {"size", 1, 0, 's'},
-        {"address", 1, 0, 'a'},
+        {"obs", 1, 0, 'o'},
+        {"targ", 1, 0, 't'},
+        {"nbr", 1, 0, 'n'},
+        {"adobs", 1, 0, 'x'},
+        {"adtarg", 1, 0, 'y'},
         COMMON_LONG_OPTS
     };
 
-        SWITCH_FOREACH_OPT(opt, "a:o:s:t:", opts, "map", 0) {
+        SWITCH_FOREACH_OPT(opt, "o:t:n:x:y", opts, "map", 0) {
     case 'o':
         map_info.id_obs = strtoull(optarg, NULL, 0);
         break;
     case 't':
         map_info.id_targ = strtoull(optarg, NULL, 0);
         break;
-    case 's':
-        map_info.size = strtoull(optarg, NULL, 0);
+    case 'n':
+        map_info.nbr = strtoull(optarg, NULL, 0);
         break;
-    case 'a':
-        map_info.address = strtoull(optarg, NULL, 0);
+    case 'x':
+        map_info.ad_obs = strtoull(optarg, NULL, 0);
+        break;
+    case 'y':
+        map_info.ad_targ = strtoull(optarg, NULL, 0);
         break;
     }
 
-    // Just print the options for now, until we implement the map command
 
-    fprintf(stderr, "\n Just print the options for now, until we implement the map command:\n");
-    fprintf(stderr, "  observer domain id: %u\n", map_info.id_obs ? map_info.id_obs : 0);
-    fprintf(stderr, "  target domain id : %u\n", map_info.id_targ ? map_info.id_targ : 0);
-    fprintf(stderr, "  size: %lu\n", map_info.size);
-    fprintf(stderr, "  address: %lu\n", map_info.address);
+    rc = map_domain(&map_info);
+    if (rc < 0) {
+        fprintf(stderr, "Failed to map domain: %s\n", strerror(-rc));
+        return -rc;
+    }
 
-    
-
-
-    return 1;
+    return 0;
 }
 
 int main_create(int argc, char **argv)

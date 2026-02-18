@@ -72,6 +72,75 @@ int xc_domain_pause(xc_interface *xch,
     return do_domctl(xch, &domctl);
 }
 
+int xc_domain_map(xc_interface *xch)
+{
+
+    // code comming soon 
+    uint64_t target_idxs[1] = {0};   
+    int errs[1] = {-1};
+    uint64_t observer_gpfns[1] = {983040}; 
+    
+    int r; 
+
+
+    struct xen_add_to_physmap_batch xatpb = {
+        .domid = 1,
+        .space = XENMAPSPACE_gmfn_foreign,
+        .size  = 1,
+        .u = {
+            .foreign_domid = 2,
+        },
+    };
+
+
+    DECLARE_HYPERCALL_BOUNCE(observer_gpfns,
+                            sizeof(observer_gpfns),
+                            XC_HYPERCALL_BUFFER_BOUNCE_IN);
+
+    if ( xc_hypercall_bounce_pre(xch, observer_gpfns) )
+        return -1;
+
+    DECLARE_HYPERCALL_BOUNCE(errs,
+                            sizeof(errs),
+                            XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+
+    if ( xc_hypercall_bounce_pre(xch, errs) )
+        return -1;
+ 
+
+    DECLARE_HYPERCALL_BOUNCE(target_idxs,
+                            sizeof(target_idxs),
+                            XC_HYPERCALL_BUFFER_BOUNCE_IN);
+
+    if ( xc_hypercall_bounce_pre(xch, target_idxs) )
+        return -1;
+
+
+    set_xen_guest_handle(xatpb.gpfns, observer_gpfns);
+
+    set_xen_guest_handle(xatpb.idxs, target_idxs);
+
+    set_xen_guest_handle(xatpb.errs, errs);
+
+    r = xc_memory_op(xch, XENMEM_add_to_physmap_batch, &xatpb, sizeof(xatpb));
+
+    // 3. Sync data back from the hypervisor
+    xc_hypercall_bounce_post(xch, errs);
+    
+    if ((r < 0) || (errs[0] != 0)) {
+        fprintf(stderr, "Failed to mappp domain: hypercall returned %d, errs[0] = %d\n", r, errs[0]);
+        return -1;
+    }
+
+    else {
+        // fprintf(stderr, "Successfully mapped domain: hypercall returned %d, errs[0] = %d\n", r, errs[0]);
+        printf("Success! Target GFN 0 is now at Observer GPA 0xf0000000\n");
+    }
+
+
+    return 1;
+}
+
 
 int xc_domain_unpause(xc_interface *xch,
                       uint32_t domid)
@@ -1048,8 +1117,17 @@ int xc_domain_add_to_physmap_batch(xc_interface *xch,
     set_xen_guest_handle(xatp_batch.gpfns, gpfns);
     set_xen_guest_handle(xatp_batch.errs, errs);
 
+   
+    fprintf(stderr, "\nxc_memory_op call with following params :\n\n");
+    fprintf(stderr, "Obs.  id = %u\n", xatp_batch.domid);
+    fprintf(stderr, "Targ. id = %u\n", xatp_batch.u.foreign_domid);
+    // fprintf(stderr, "size = %u\n", xatp_batch.size);
+    fprintf(stderr, "Obs.  frame  address = %lu\n", gpfns[0]);
+    fprintf(stderr, "Targ. frame  address = %lu\n", idxs[0]);
+
     rc = xc_memory_op(xch, XENMEM_add_to_physmap_batch,
                       &xatp_batch, sizeof(xatp_batch));
+
 
 out:
     xc_hypercall_bounce_post(xch, idxs);
