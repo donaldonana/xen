@@ -32,6 +32,64 @@
 #include "xl_utils.h"
 #include "xl_parse.h"
 
+
+#define PAGE_SIZE 4096UL
+#define MMIO_HOLE_START 0xF0000000UL  
+#define FOUR_GB_START   0x100000000UL // 4GB 
+#define LEGACY_RAM_END  0x000A0000UL
+#define MAIN_RAM_START  0x00100000UL
+
+
+// #phd_code
+memmap_t build_mmap_region(uint64_t ram_size)
+{
+
+    memmap_t map = {0}; 
+    int nbr = 0;
+    map.size = 0;
+
+    // Region 1  0x0 -- LEGACY_RAM_END
+    map.regions[nbr].start_gfn = 0x0; 
+    map.regions[nbr].end_gfn = LEGACY_RAM_END / PAGE_SIZE ;
+    
+    map.size += map.regions[nbr].end_gfn - map.regions[nbr].start_gfn;
+    nbr++;
+
+    if (ram_size <= MMIO_HOLE_START)
+    {
+         
+        // Region 2: 0x100000 - end of RAM
+        map.regions[nbr].start_gfn = MAIN_RAM_START / PAGE_SIZE;
+        map.regions[nbr].end_gfn   = ram_size / PAGE_SIZE;
+        map.size += map.regions[nbr].end_gfn - map.regions[nbr].start_gfn;
+        
+        nbr++;
+    } else {
+
+        // Region 2: 0x100000 - 0xF0000000 (PCI hole)
+        map.regions[nbr].start_gfn = MAIN_RAM_START / PAGE_SIZE;
+        map.regions[nbr].end_gfn   = MMIO_HOLE_START / PAGE_SIZE;
+        map.size += map.regions[nbr].end_gfn - map.regions[nbr].start_gfn;
+
+        nbr++;
+
+        // Region 3: remainder remapped above 4GiB
+        uint64_t below_4gb_ram = MMIO_HOLE_START - MAIN_RAM_START + LEGACY_RAM_END;
+        uint64_t remaining     = ram_size - below_4gb_ram;
+
+        map.regions[nbr].start_gfn = FOUR_GB_START / PAGE_SIZE;
+        map.regions[nbr].end_gfn   = (FOUR_GB_START + remaining) / PAGE_SIZE;
+        map.size += map.regions[nbr].end_gfn - map.regions[nbr].start_gfn;
+        nbr++;
+    }
+    
+    map.count = nbr;
+
+    return map; 
+
+}
+
+
 static int fd_lock = -1;
 
 static void pause_domain(uint32_t domid)
@@ -651,23 +709,144 @@ static void autoconnect_console(libxl_ctx *ctx_ignored,
     _exit(1);
 }
 
+// #phd_code
 int map_domain(struct domain_map *map_info)
 {
- 
-    uint32_t id_obs, id_targ;
-    uint64_t size;
-    uint64_t target_idxs[1], observer_gpfns[1];
-    
-    observer_gpfns[0] = map_info->ad_obs ;
-    target_idxs[0]    = map_info->ad_targ ;
-    id_obs  = map_info->id_obs;
-    id_targ = map_info->id_targ;    
-    size    = 1; 
- 
 
-    libxl_domain_map(ctx, id_obs, id_targ, target_idxs, observer_gpfns, NULL);
+    uint64_t size = 1;
+    uint32_t id_obs, id_targ;
+    uint64_t targ_ram, obs_ram; 
+
+    uint64_t *target_idxs, *observer_gpfns ;   
+
+    libxl_dominfo *info = malloc(sizeof(libxl_dominfo)); 
+    
+    if (map_info->all)
+    {
+
+        libxl_domain_info(ctx, info, map_info->id_targ);
+
+        printf("\n-Target memory size in KB: %lu KB\n", info->current_memkb);
+
+        targ_ram = info->current_memkb * 1024;    // Target RAM size allocate by Xen (in bytes)
+
+        memmap_t targ_map = build_mmap_region(targ_ram);
+
+        size = targ_map.size;
+        target_idxs    = malloc(size* sizeof(uint64_t));
+
+        libxl_domain_info(ctx, info, map_info->id_obs);
+        obs_ram  =  info->current_memkb * 1024;    // Observer RAM size allocate by Xen (in bytes)
+
+        memmap_t obs_map  = build_mmap_region(obs_ram);
+
+        printf("\n-Target : ") ;
+        printf("\nTarget total size in number of page : %d pages\n", targ_map.size);
+        // printf("Target number of regions: %d\n", targ_map.count);
+
+        /*Target Walk mmap walk*/
+        int nbr_frame = 0;
+        for (int i = 0; i < targ_map.count; i++) {
+            printf("Region %d: GFN 0x%lx - 0x%lx\n",
+                i,
+                targ_map.regions[i].start_gfn,
+                targ_map.regions[i].end_gfn);
+
+            for (uint64_t gfn = targ_map.regions[i].start_gfn;
+                gfn < targ_map.regions[i].end_gfn;
+                gfn++) {
+
+                target_idxs[nbr_frame] = gfn;
+                nbr_frame ++;
+            }
+        }
+
+
+        /*Observer Walk mmap walk*/
+        uint64_t counted = 0;
+        uint64_t base_gfn = 0;
+        observer_gpfns = malloc(size* sizeof(uint64_t));
+
+        uint64_t private_size = obs_map.size - targ_map.size;  
+
+        for (int i = 0; i < obs_map.count; i++) {
+
+            for (uint64_t gfn = obs_map.regions[i].start_gfn;
+                gfn < obs_map.regions[i].end_gfn;
+                gfn++) {
+
+                counted++;
+                if (counted == private_size) {
+                    base_gfn = gfn + 1;   
+                    goto found;
+                }
+            }
+        }
+
+        found:
+
+            // base_gfn = 524380;
+
+            printf("\n-Observer : ") ;
+            printf("\nObserver base point GFN: 0x%lx\n", base_gfn);
+            printf("\nObserver total size in number of page : %d pages\n", obs_map.size);
+
+            counted = 0;
+
+            // TODO: We can optimize this by starting with the region which contains base_gfn instead of starting from the again again.
+            for (int i = 0; i < obs_map.count && counted < targ_map.size; i++) {
+
+                for (uint64_t gfn = obs_map.regions[i].start_gfn;
+                    gfn < obs_map.regions[i].end_gfn && counted < targ_map.size;
+                    gfn++) {
+
+                    if (gfn >= base_gfn) {
+                        observer_gpfns[counted] = gfn;
+                        counted++;
+                    }
+                }
+            }
+
+        printf("number of observer frames reserved for a target: %ld\n \n", counted);
+
+        // printf("\nMapping all frames from domain %u into domain %u\n", map_info->id_targ, map_info->id_obs);
+
+        id_obs  = map_info->id_obs;
+        id_targ = map_info->id_targ; 
+
+
+        // size = 6;
+        libxl_domain_map(ctx, id_obs, id_targ, target_idxs, observer_gpfns, size, NULL);
+
+    }
+
+    else
+    {
+
+        
+        printf("\nMapping page 0x%lx from domain %u into domain %u\n", map_info->ad_targ, map_info->id_targ, map_info->id_obs);
+
+        target_idxs    = malloc(size* sizeof(uint64_t));
+        observer_gpfns = malloc(size* sizeof(uint64_t));
+
+        *(observer_gpfns) = map_info->ad_obs ;
+        *(target_idxs)    = map_info->ad_targ ;
+        id_obs  = map_info->id_obs;
+        id_targ = map_info->id_targ;    
+ 
+        libxl_domain_map(ctx, id_obs, id_targ, target_idxs, observer_gpfns, size, NULL);
+
+    }
+
+    free(target_idxs);
+    free(observer_gpfns);
+    free(info);
 
     return 1;
+
+    
+ 
+    
 
 }
 
@@ -1189,6 +1368,7 @@ out:
     return ret;
 }
 
+// #phd_code
 int main_map(int argc, char **argv)
 {
 
@@ -1198,6 +1378,7 @@ int main_map(int argc, char **argv)
         .nbr = 0,
         .ad_obs = 0,
         .ad_targ = 0,
+        .all = 0
     };
 
     int rc, opt;
@@ -1206,11 +1387,12 @@ int main_map(int argc, char **argv)
         {"targ", 1, 0, 't'},
         {"nbr", 1, 0, 'n'},
         {"adobs", 1, 0, 'x'},
+        {"all", 0, 0, 'a'},
         {"adtarg", 1, 0, 'y'},
         COMMON_LONG_OPTS
     };
 
-        SWITCH_FOREACH_OPT(opt, "o:t:n:x:y", opts, "map", 0) {
+        SWITCH_FOREACH_OPT(opt, "o:t:n:x:y:a", opts, "map", 0) {
     case 'o':
         map_info.id_obs = strtoull(optarg, NULL, 0);
         break;
@@ -1225,6 +1407,9 @@ int main_map(int argc, char **argv)
         break;
     case 'y':
         map_info.ad_targ = strtoull(optarg, NULL, 0);
+        break;
+    case 'a':
+        map_info.all = 1;
         break;
     }
 

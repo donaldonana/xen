@@ -864,7 +864,7 @@ int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
 
     if ( xatp->space != XENMAPSPACE_gmfn_range )
         return xenmem_add_to_physmap_one(d, xatp->space, extra,
-                                         xatp->idx, _gfn(xatp->gpfn));
+                                         xatp->idx, _gfn(xatp->gpfn), NULL);
 
     if ( xatp->size < start )
         return -EILSEQ;
@@ -896,7 +896,7 @@ int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
     while ( xatp->size > done )
     {
         rc = xenmem_add_to_physmap_one(d, XENMAPSPACE_gmfn, extra,
-                                       xatp->idx, _gfn(xatp->gpfn));
+                                       xatp->idx, _gfn(xatp->gpfn), NULL);
         if ( rc < 0 )
             break;
 
@@ -953,6 +953,8 @@ static int xenmem_add_to_physmap_batch(struct domain *d,
                                        unsigned int extent)
 {
     union add_to_physmap_extra extra = {};
+    int counter[5] = { 0 };
+    int invalid = 0;
 
     /*
      * In some configurations, (!HVM, COVERAGE), the xenmem_add_to_physmap_one()
@@ -989,6 +991,7 @@ static int xenmem_add_to_physmap_batch(struct domain *d,
         break;
     }
 
+
     while ( xatpb->size > extent )
     {
         xen_ulong_t idx;
@@ -1002,19 +1005,34 @@ static int xenmem_add_to_physmap_batch(struct domain *d,
             return -EFAULT;
 
         if ( gfn_eq(_gfn(gpfn), INVALID_GFN) )
+        {
+            invalid++;
             return -EINVAL;
+        }
 
         rc = xenmem_add_to_physmap_one(d, xatpb->space, extra,
-                                       idx, _gfn(gpfn));
+                                       idx, _gfn(gpfn), counter);
 
         if ( unlikely(__copy_to_guest_offset(xatpb->errs, extent, &rc, 1)) )
             return -EFAULT;
 
         /* Check for continuation if it's not the last iteration. */
         if ( xatpb->size > ++extent && hypercall_preempt_check() )
+        {
+            
+           printk("--Hole pages : %d, special pages : %d,  invalid: %d, normal pages : %d no mfn page : %d, page no take : %d \n",
+           counter[0], counter[1], invalid, counter[2], counter[3], counter[4]);
+
+            printk("extent : %d, size : %d \n", extent, xatpb->size);
             return extent;
+        }
     }
 
+    printk("--Hole pages : %d, special pages : %d,  invalid: %d, normal pages : %d no mfn page : %d, page no take : %d \n",
+           counter[0], counter[1], invalid, counter[2], counter[3], counter[4]);
+
+            printk("extent : %d, size : %d \n", extent, xatpb->size);
+    
     return 0;
 }
 
@@ -1119,8 +1137,6 @@ static long xatp_permission_check(struct domain *d, unsigned int space)
     if ( (space == XENMAPSPACE_dev_mmio) &&
          (!is_hardware_domain(d) || (d != current->domain)) )
         return -EACCES;
-
-    printk( "********domain %d pass XENMAPSPACE_dev_mmio check ********\n", d->domain_id );
 
     return xsm_add_to_physmap(XSM_TARGET, current->domain, d);
 }
@@ -1575,7 +1591,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         return rc;
     }
-    // XENMEM_add_to_physmap_range
+    // XENMEM_add_to_physmap_range in linux kernel code.
     case XENMEM_add_to_physmap_batch:
     {
 
@@ -1598,46 +1614,32 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             return -EOPNOTSUPP;
         }
 
-        printk( "********space %d********\n", xatpb.space);
-
 
         d = rcu_lock_domain_by_any_id(xatpb.domid);
         if ( d == NULL )
             return -ESRCH;
         
-        printk( "********domain %d pass ESRCH check ********\n", xatpb.domid);
         
-
         rc = xatp_permission_check(d, xatpb.space);
         if ( rc )
         {
             rcu_unlock_domain(d);
-            printk( "********domain %d fail permission check ********\n", xatpb.domid);
             return rc;
         }
-        printk( "********domain %d pass permission check ********\n", xatpb.domid);
 
         rc = xenmem_add_to_physmap_batch(d, &xatpb, start_extent);
 
         rcu_unlock_domain(d);
-        printk( "********domain %dpass add_to_physmap_batch ********\n", xatpb.domid);
     
-
         if ( rc > 0 )
         {
 
             rc = hypercall_create_continuation(
                     __HYPERVISOR_memory_op, "lh",
                     op | (rc << MEMOP_EXTENT_SHIFT), arg);
-            
-            printk( "********domain %dpass ahypercall_create_continuation ********\n", xatpb.domid);
 
         }
-
-            
-
-            
-
+ 
         return rc;
     }
 

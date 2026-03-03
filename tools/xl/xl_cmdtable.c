@@ -31,6 +31,7 @@ const struct cmd_spec cmd_table[] = {
       "-t, --targ         [DomID]        target domain id to map from.\n"
       "-x, --adobs        [Address]      observer frame address to map into. \n"
       "-y, --adtarg       [Address]      target frame address to map from. \n"
+      "-a, --all          [bool]       map all frames from target domain into observer domain\n "
       "-h                                print this help.\n"
       // "-n, --nbr       [Number]        number of frames to map.\n"
     },

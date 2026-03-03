@@ -1118,12 +1118,12 @@ int xc_domain_add_to_physmap_batch(xc_interface *xch,
     set_xen_guest_handle(xatp_batch.errs, errs);
 
    
-    fprintf(stderr, "\nxc_memory_op call with following params :\n\n");
-    fprintf(stderr, "Obs.  id = %u\n", xatp_batch.domid);
-    fprintf(stderr, "Targ. id = %u\n", xatp_batch.u.foreign_domid);
-    // fprintf(stderr, "size = %u\n", xatp_batch.size);
-    fprintf(stderr, "Obs.  frame  address = %lu\n", gpfns[0]);
-    fprintf(stderr, "Targ. frame  address = %lu\n", idxs[0]);
+    // fprintf(stderr, "\nxc_memory_op call with following params :\n\n");
+    // fprintf(stderr, "Obs.  id = %u\n", xatp_batch.domid);
+    // fprintf(stderr, "Targ. id = %u\n", xatp_batch.u.foreign_domid);
+    // // fprintf(stderr, "size = %u\n", xatp_batch.size);
+    // fprintf(stderr, "Obs.  frame  address = %lu\n", gpfns[0]);
+    // fprintf(stderr, "Targ. frame  address = %lu\n", idxs[0]);
 
     rc = xc_memory_op(xch, XENMEM_add_to_physmap_batch,
                       &xatp_batch, sizeof(xatp_batch));

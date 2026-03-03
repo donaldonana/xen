@@ -32,6 +32,7 @@
 #include "mm-locks.h"
 #include "p2m.h"
 
+
 /* Override macro from asm/page.h to make work with mfn_t */
 #undef virt_to_mfn
 #define virt_to_mfn(v) _mfn(__virt_to_mfn(v))
@@ -43,6 +44,7 @@ bool __initdata opt_hap_1gb = true;
 bool __initdata opt_hap_2mb = true;
 boolean_param("hap_1gb", opt_hap_1gb);
 boolean_param("hap_2mb", opt_hap_2mb);
+
 
 int p2m_init_logdirty(struct p2m_domain *p2m)
 {
@@ -1866,16 +1868,16 @@ out_p2m_audit:
  * Returns: 0 ==> success
  */
 static int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
-                           unsigned long gpfn, domid_t foreigndom)
+                           unsigned long gpfn, domid_t foreigndom, int *counter)
 {
     p2m_type_t p2mt, p2mt_prev;
     mfn_t prev_mfn, mfn;
     struct page_info *page;
     int rc;
     struct domain *fdom;
+    
 
     if ( !arch_acquire_resource_check(tdom) )
-        printk( "******** FAILL HERE  arch_acquire_resource_check ********\n" );
 
         return -EPERM;
 
@@ -1903,12 +1905,15 @@ static int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
     page = get_page_from_gfn(fdom, fgfn, &p2mt, P2M_ALLOC);
     if ( !page )
     {
+        counter[4] ++;
+
         rc = -EINVAL;
         goto out;
     }
 
     if ( !p2m_is_ram(p2mt) || p2m_is_shared(p2mt) || p2m_is_hole(p2mt) )
     {
+        counter[0] ++;
         rc = -EINVAL;
         goto put_one;
     }
@@ -1919,15 +1924,27 @@ static int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
     if ( mfn_valid(prev_mfn) )
     {
         if ( is_special_page(mfn_to_page(prev_mfn)) )
+        {
             /* Special pages are simply unhooked from this phys slot */
             rc = p2m_remove_page(tdom, _gfn(gpfn), prev_mfn, 0);
+            counter[1] ++;
+        }
+            
         else
+        {
             /* Normal domain memory is freed, to avoid leaking memory. */
             rc = guest_remove_page(tdom, gpfn);
+            counter[2] ++;
+        }
         if ( rc )
             goto put_both;
     }
-    printk( "******** REMOVE OK ********\n" );
+
+    else
+    {
+        counter[3] ++;
+    }
+      
 
     /*
      * Create the new mapping. Can't use p2m_add_page() because it
@@ -1940,10 +1957,6 @@ static int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
                  "gpfn:%lx mfn:%lx fgfn:%lx td:%d fd:%d\n",
                  gpfn, mfn_x(mfn), fgfn, tdom->domain_id, fdom->domain_id);
     
-
-    printk( "******** ADD FOREIGN OK ********\n" );
-    
-
  put_both:
     /*
      * This put_gfn for the above get_gfn for prev_mfn.  We must do this
@@ -1959,6 +1972,7 @@ static int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
     if ( fdom )
         rcu_unlock_domain(fdom);
 
+    
     return rc;
 }
 
@@ -1967,7 +1981,8 @@ int xenmem_add_to_physmap_one(
     unsigned int space,
     union add_to_physmap_extra extra,
     unsigned long idx,
-    gfn_t gfn)
+    gfn_t gfn, 
+    int *counter)
 {
     struct page_info *page = NULL;
     unsigned long gmfn = 0 /* gcc ... */, old_gfn;
@@ -2008,9 +2023,8 @@ int xenmem_add_to_physmap_one(
     }
 
     case XENMAPSPACE_gmfn_foreign:
-        printk( "******** RUN XENMAPSPACE_gmfn_foreign  ********\n" );
 
-        return p2m_add_foreign(d, idx, gfn_x(gfn), extra.foreign_domid);
+        return p2m_add_foreign(d, idx, gfn_x(gfn), extra.foreign_domid, counter);
     }
 
     if ( mfn_eq(mfn, INVALID_MFN) )

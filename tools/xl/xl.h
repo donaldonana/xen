@@ -29,7 +29,7 @@ struct cmd_spec {
     const char *cmd_option;
 };
 
-
+// #phd_code
 struct domain_map
 {
     uint32_t id_obs; /*  observer domain id to map into */
@@ -37,7 +37,35 @@ struct domain_map
     uint64_t nbr;
     uint64_t ad_obs; /* observer frame address to map into */
     uint64_t ad_targ; /* target frame address to map from */
+
+    bool all; /* if set, map all frames from target domain into observer domain, ignoring ad_obs and ad_targ */
+    
 };
+
+
+// #phd_code
+typedef struct 
+{
+    uint64_t start_gfn; 
+    uint64_t end_gfn;
+    
+
+} ram_gerion_t;
+
+// #phd_code
+typedef struct 
+{
+    /*List of mmap memory regions*/
+    ram_gerion_t regions[3];
+
+    /*Number of valid mmap regions (at most 3 regions) */
+    int count; 
+
+    /*Total size in pages.*/
+    int size;   
+} memmap_t;
+
+
 
 struct domain_create {
     int debug;
@@ -59,10 +87,13 @@ struct domain_create {
     int send_back_fd; /* -1 means none */
     char **migration_domname_r; /* from malloc */
 };
-
+// #phd_code
 int create_domain(struct domain_create *dom_info);
 
 int map_domain(struct domain_map *map_info);
+
+// #phd_code
+memmap_t build_mmap_region(uint64_t ram_size);
 
 
 static const char savefileheader_magic[32]=

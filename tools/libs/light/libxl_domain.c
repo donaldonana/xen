@@ -15,8 +15,10 @@
 #include "libxl_osdeps.h"
 
 #include "libxl_internal.h"
- 
 
+#define MAX_BATCH 4096
+ 
+// PAGE_TO_MEMKB(xcinfo->tot_pages)
 #define PAGE_TO_MEMKB(pages) ((pages) * 4)
 
 int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
@@ -574,32 +576,66 @@ int libxl_domain_suspend_only(libxl_ctx *ctx, uint32_t domid,
     return AO_CREATE_FAIL(rc);
 }
 
-
+// #phd_code
 int libxl_domain_map(libxl_ctx *ctx, uint32_t id_obs, uint32_t id_targ, uint64_t *target_idxs, 
-     uint64_t *observer_gpfns, 
+     uint64_t *observer_gpfns, uint64_t size, 
     const libxl_asyncop_how *ao_how)
 {
 
-    int r;
    
-    int errs[1] = {-555};
+    // int r;
+    unsigned int chunk ;
+    int nrfails = 0;
+    int nrsucs = 0;
+   
+    int *errs = malloc(sizeof(int) * size);
+    memset(errs, -1, sizeof(int) * size); 
 
-    r = xc_domain_add_to_physmap_batch(ctx->xch, 
-                                   id_obs,               // Observer DomID
-                                   id_targ,              // Target DomID
-                                   XENMAPSPACE_gmfn_foreign, 
-                                   1,                    // nbr of frames to map
-                                   target_idxs, 
-                                   observer_gpfns, 
-                                   errs);
+    for (size_t offset = 0; offset < size; offset += MAX_BATCH) {
 
-    if (r < 0 || errs[0] != 0) {
-        fprintf(stderr, "\nFailed: r=%d, errs[0]=%d\n", r, errs[0]);
-    } else {
-        printf("\nSuccessfully mapped  domain %u frame %lu into domain %u frame %lu\n", id_targ, target_idxs[0], id_obs, observer_gpfns[0]);
+        chunk = size - offset;
+
+        if (chunk > MAX_BATCH)
+            chunk = MAX_BATCH;
+
+        xc_domain_add_to_physmap_batch(
+            ctx->xch,
+            id_obs,         // Observer DomID
+            id_targ,         // Target DomID
+            XENMAPSPACE_gmfn_foreign,
+            chunk,           // Number of frames (pages) to map
+            target_idxs + offset,
+            observer_gpfns + offset,
+            errs + offset
+        );
+    }
+ 
+    
+    for (size_t i = 0; i < size; i++)
+    {
+         // check each errs and page 
+            if (errs[i] < 0)
+            {
+                // printf("Mapping page 0x%lx from domain %u into page 0x%lx in domain %u failed with error code %d\n", 
+                //     target_idxs[i], id_targ, observer_gpfns[i], id_obs, errs[i]);
+                
+                nrfails++;
+            }
+             else
+            {
+                //printf("Mapping page 0x%lx from domain %u into page 0x%lx in domain  %u succeeded with error code %d\n", 
+                    // target_idxs[i], id_targ, observer_gpfns[i], id_obs, errs[i]);
+
+                nrsucs++;
+            }
     }
 
-
+     
+    printf("%d pages failed to map.\n", nrfails);
+    printf("%d pages succeeded to map.\n", nrsucs);
+    
+    free(errs);
+    
     return 1; 
 }
 
